@@ -224,10 +224,27 @@ CREATE OR REPLACE PACKAGE BODY otm AS
         correo_activacion(af);
     END;
 
-    PROCEDURE activa_instalacion(o ot_mantto%ROWTYPE, a activo_fijo%ROWTYPE) IS
+    PROCEDURE activa_activo_fijo(ot IN OUT ot_mantto%ROWTYPE, af IN OUT activo_fijo%ROWTYPE, fch DATE) IS
     BEGIN
-        --         TODO implementar
+        af.fecha_activacion := fch;
+        af.valor_adquisicion_s := ot.total_activo_soles;
+        af.valor_adquisicion_d := ot.total_activo_dolares;
+        af.otm_tipo := ot.id_tipo;
+        af.otm_serie := ot.id_serie;
+        af.otm_numero := ot.id_numero;
+        af.cod_estado := 1;
+        api_activo_fijo.upd(af);
+    END;
+
+    PROCEDURE activa_servicio_instalacion(ot IN OUT ot_mantto%ROWTYPE, af IN OUT activo_fijo%ROWTYPE) IS
+    BEGIN
         NULL;
+    END;
+
+    PROCEDURE activa_instalacion(ot IN OUT ot_mantto%ROWTYPE, af IN OUT activo_fijo%ROWTYPE, fch DATE) IS
+    BEGIN
+        activa_activo_fijo(ot, af, fch);
+        activa_servicio_instalacion(ot, af);
     END;
 
     PROCEDURE envia_al_gasto(ot IN OUT ot_mantto%ROWTYPE, fch DATE) IS
@@ -258,15 +275,15 @@ CREATE OR REPLACE PACKAGE BODY otm AS
         CASE opcion
             WHEN otm_cst.activo THEN
                 valida_activacion(af, ot);
-                es_mantenimiento := ot.id_tipo = 'MQ';
-                es_instalacion := ot.id_tipo = 'IN';
+                es_mantenimiento := ot.id_modo = 'MAN';
+                es_instalacion := ot.id_modo = 'INS';
 
                 IF es_mantenimiento THEN
                     activa_mantenimiento(ot, fch);
                 END IF;
 
                 IF es_instalacion THEN
-                    activa_instalacion(ot, af);
+                    activa_instalacion(ot, af, fch);
                 END IF;
             WHEN otm_cst.gasto THEN
                 envia_al_gasto(ot, fch);
