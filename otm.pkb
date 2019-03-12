@@ -78,6 +78,32 @@ CREATE OR REPLACE PACKAGE BODY otm AS
         RETURN val;
     END;
 
+    FUNCTION valor_servicio(tpo ot_mantto.id_tipo%TYPE, ser ot_mantto.id_serie%TYPE,
+                            num ot_mantto.id_numero%TYPE) RETURN T_VALOR IS
+        val T_VALOR;
+    BEGIN
+        SELECT nvl(sum(soles), 0), nvl(sum(dolares), 0) INTO val
+          FROM vw_compra_otm
+         WHERE otm_serie = valor_servicio.ser
+           AND otm_numero = valor_servicio.num
+           AND otm_tipo = valor_servicio.tpo;
+
+        RETURN val;
+    END;
+
+    FUNCTION valor_repuesto(tpo ot_mantto.id_tipo%TYPE, ser ot_mantto.id_serie%TYPE,
+                            num ot_mantto.id_numero%TYPE) RETURN T_VALOR IS
+        val T_VALOR;
+    BEGIN
+        SELECT nvl(sum(valor_sol), 0), nvl(sum(valor_dol), 0) INTO val
+          FROM vw_repuesto_otm
+         WHERE otm_serie = valor_repuesto.ser
+           AND otm_numero = valor_repuesto.num
+           AND otm_tipo = valor_repuesto.tpo;
+
+        RETURN val;
+    END;
+
     FUNCTION esta_en_curso(p_tipo ot_mantto.id_tipo%TYPE, p_art ot_mantto.id_activo_fijo%TYPE) RETURN BOOLEAN IS
         c PLS_INTEGER := 0;
     BEGIN
@@ -90,7 +116,7 @@ CREATE OR REPLACE PACKAGE BODY otm AS
         RETURN c > 0;
     END;
 
-    PROCEDURE correo_activacion(af activo_fijo%ROWTYPE) IS
+    PROCEDURE envia_correo_activacion(af activo_fijo%ROWTYPE) IS
         CURSOR cr_correos IS
             SELECT correo
               FROM notificacion
@@ -211,9 +237,9 @@ CREATE OR REPLACE PACKAGE BODY otm AS
         af.depreciable := 'S';
 
         api_activo_fijo.ins(af);
-        sp_asiento_activacion(ot, af, trunc(fch));
+        otm_asiento.activacion(ot, af, trunc(fch));
 
-        ot.estado := '8';
+        ot.estado := 8;
         ot.fecha_cierre := fch;
         ot.usuario_cierre := user;
         ot.registro_contable := otm_cst.activo;
@@ -221,7 +247,7 @@ CREATE OR REPLACE PACKAGE BODY otm AS
         ot.total_dolares := val.dolares;
         api_ot_mantto.upd(ot);
 
-        correo_activacion(af);
+        envia_correo_activacion(af);
     END;
 
     PROCEDURE activa_activo_fijo(ot IN OUT ot_mantto%ROWTYPE, af IN OUT activo_fijo%ROWTYPE, fch DATE) IS
@@ -234,23 +260,74 @@ CREATE OR REPLACE PACKAGE BODY otm AS
         af.otm_numero := ot.id_numero;
         af.cod_estado := 1;
         api_activo_fijo.upd(af);
+        otm_asiento.activacion(ot, af, fch);
     END;
 
-    PROCEDURE activa_servicio_instalacion(ot IN OUT ot_mantto%ROWTYPE, af IN OUT activo_fijo%ROWTYPE) IS
+    PROCEDURE activa_servicio_instalacion(ot IN OUT ot_mantto%ROWTYPE, fch DATE) IS
+        subclase CONSTANT VARCHAR2(3) := 'INS';
+        correlativo PLS_INTEGER := 0;
+        af activo_fijo%ROWTYPE;
+        servicio T_VALOR;
+        repuesto T_VALOR;
     BEGIN
-        NULL;
+        correlativo := pkg_activo_fijo.correlativo_subclase(ot.id_activo_fijo, subclase);
+        af.cod_activo_fijo := ot.id_activo_fijo || ' ' || subclase || correlativo;
+        af.descripcion :=
+                'INSTALACION DE MAQUINA ' || ot.id_activo_fijo || ' OTM ' || ot.id_serie || '-' || ot.id_numero;
+        af.cod_estado := '1';
+        af.cod_clase := 'MAQ';
+        af.cod_subclase := subclase;
+        af.centro_costo := ot.centro_costo;
+        af.tangible_intangible := 'I';
+        af.cod_tipo_adquisicion := 'PROPIO';
+        servicio := valor_servicio(ot.id_tipo, ot.id_serie, ot.id_numero);
+        repuesto := valor_repuesto(ot.id_tipo, ot.id_serie, ot.id_numero);
+        af.valor_adquisicion_s := servicio.soles + repuesto.soles;
+        af.valor_adquisicion_d := servicio.dolares + repuesto.dolares;
+        af.moneda_adquisicion := 'S';
+        af.otm_tipo := ot.id_tipo;
+        af.otm_serie := ot.id_serie;
+        af.otm_numero := ot.id_numero;
+        af.cod_metodo_deprec := 'LIN';
+        af.porcentaje_nif := 10;
+        af.porcentaje_tributario := 10;
+        af.porcentaje_precios := 10;
+        af.cod_adicion := ot.id_activo_fijo;
+        af.fecha_adquisicion := fch;
+        af.fecha_activacion := fch;
+        af.depreciable := 'S';
+
+        api_activo_fijo.ins(af);
+        otm_asiento.activacion(ot, af, trunc(fch));
+    END;
+
+    PROCEDURE cierra_orden(ot IN OUT ot_mantto%ROWTYPE, fch DATE) IS
+        servicio T_VALOR;
+        repuesto T_VALOR;
+    BEGIN
+        servicio := valor_servicio(ot.id_tipo, ot.id_serie, ot.id_numero);
+        repuesto := valor_repuesto(ot.id_tipo, ot.id_serie, ot.id_numero);
+        ot.estado := 8;
+        ot.fecha_cierre := fch;
+        ot.usuario_cierre := user;
+        ot.registro_contable := otm_cst.activo;
+        ot.total_soles := ot.total_activo_soles + servicio.soles + repuesto.soles;
+        ot.total_dolares := ot.total_activo_dolares + servicio.dolares + repuesto.dolares;
+        api_ot_mantto.upd(ot);
     END;
 
     PROCEDURE activa_instalacion(ot IN OUT ot_mantto%ROWTYPE, af IN OUT activo_fijo%ROWTYPE, fch DATE) IS
     BEGIN
         activa_activo_fijo(ot, af, fch);
-        activa_servicio_instalacion(ot, af);
+        activa_servicio_instalacion(ot, fch);
+        cierra_orden(ot, fch);
+        envia_correo_activacion(af);
     END;
 
     PROCEDURE envia_al_gasto(ot IN OUT ot_mantto%ROWTYPE, fch DATE) IS
         val T_VALOR;
     BEGIN
-        sp_asiento_gasto(ot, trunc(fch));
+        otm_asiento.gasto(ot, trunc(fch));
         correo_gasto(ot);
         ot.estado := '8';
         ot.fecha_cierre := fch;
