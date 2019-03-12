@@ -1,4 +1,6 @@
 CREATE OR REPLACE PACKAGE otm_cst AS
     activo CONSTANT VARCHAR2(30) := 'ACTIVO';
     gasto CONSTANT VARCHAR2(30) := 'GASTO';
+    mantenimiento CONSTANT VARCHAR2(30) := 'MAN';
+    instalacion CONSTANT VARCHAR2(30) := 'INS';
 END;
