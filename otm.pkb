@@ -250,7 +250,7 @@ CREATE OR REPLACE PACKAGE BODY otm AS
         envia_correo_activacion(af);
     END;
 
-    PROCEDURE saca_del_almacen(af activo_fijo%ROWTYPE, fch DATE) IS
+    PROCEDURE saca_del_almacen(af IN OUT activo_fijo%ROWTYPE, fch DATE) IS
         kg kardex_g%ROWTYPE;
         kd kardex_d%ROWTYPE;
     BEGIN
@@ -259,9 +259,9 @@ CREATE OR REPLACE PACKAGE BODY otm AS
         kg.serie := otm_cst.salida_serie;
         kg.numero := api_kardex_g.next_numero(otm_cst.salida_transac, otm_cst.salida_serie);
         kg.fch_transac := fch;
-        kg.tip_doc_ref := NULL; --TODO llenar referencia
-        kg.ser_doc_ref := NULL; --TODO llenar referencia
-        kg.nro_doc_ref := NULL; --TODO llenar referencia
+        kg.tip_doc_ref := af.otm_tipo;
+        kg.ser_doc_ref := af.otm_serie;
+        kg.nro_doc_ref := af.otm_numero;
         kg.glosa := 'Salida por activacion de activo fijo ' || af.cod_activo_fijo;
         kg.tp_relacion := 'C';
         kg.nro_lista := 1;
@@ -273,7 +273,6 @@ CREATE OR REPLACE PACKAGE BODY otm AS
         kg.ing_sal := 'S';
         kg.flg_impr := 0;
         kg.num_importa := 'SM :1 ' || kg.nro_doc_ref;
-
         api_kardex_g.ins(kg);
 
         kd.cod_alm := kg.cod_alm;
@@ -292,8 +291,12 @@ CREATE OR REPLACE PACKAGE BODY otm AS
         kd.origen := 'P';
         kd.ing_sal := 'S';
         kd.pr_referencia := 'ACTIVACION ACTIVO FIJO';
-
         api_kardex_d.ins(kd);
+
+        af.activacion_almacen := kg.cod_alm;
+        af.activacion_tp_transac := kg.tp_transac;
+        af.activacion_serie := kg.serie;
+        af.activacion_numero := kg.numero;
     END;
 
     PROCEDURE activa_activo_fijo(ot IN OUT ot_mantto%ROWTYPE, af IN OUT activo_fijo%ROWTYPE, fch DATE) IS
