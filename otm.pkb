@@ -1,4 +1,6 @@
 CREATE OR REPLACE PACKAGE BODY otm AS
+    param paramaf%ROWTYPE;
+
     PROCEDURE mail_mantto_preventivo IS
         CURSOR cr_preventivo_hoy IS
             SELECT cod_maquina, maquina, cod_operacion, operacion, frecuencia, intervalo_frecuencia
@@ -186,9 +188,7 @@ CREATE OR REPLACE PACKAGE BODY otm AS
                                num ot_mantto.id_numero%TYPE) RETURN VARCHAR2 IS
         val T_VALOR;
         opcion VARCHAR2(30);
-        param paramaf%ROWTYPE;
     BEGIN
-        param := api_paramaf.ONEROW();
         val := valor_total(tpo, ser, num);
 
         CASE
@@ -250,6 +250,52 @@ CREATE OR REPLACE PACKAGE BODY otm AS
         envia_correo_activacion(af);
     END;
 
+    PROCEDURE saca_del_almacen(af activo_fijo%ROWTYPE, fch DATE) IS
+        kg kardex_g%ROWTYPE;
+        kd kardex_d%ROWTYPE;
+    BEGIN
+        kg.cod_alm := param.almacen_activo_fijo;
+        kg.tp_transac := otm_cst.salida_transac;
+        kg.serie := otm_cst.salida_serie;
+        kg.numero := api_kardex_g.next_numero(otm_cst.salida_transac, otm_cst.salida_serie);
+        kg.fch_transac := fch;
+        kg.tip_doc_ref := NULL; --TODO llenar referencia
+        kg.ser_doc_ref := NULL; --TODO llenar referencia
+        kg.nro_doc_ref := NULL; --TODO llenar referencia
+        kg.glosa := 'Salida por activacion de activo fijo ' || af.cod_activo_fijo;
+        kg.tp_relacion := 'C';
+        kg.nro_lista := 1;
+        kg.por_desc1 := 0;
+        kg.por_desc2 := 0;
+        kg.motivo := 1;
+        kg.estado := 0;
+        kg.origen := 'P';
+        kg.ing_sal := 'S';
+        kg.flg_impr := 0;
+        kg.num_importa := 'SM :1 ' || kg.nro_doc_ref;
+
+        api_kardex_g.ins(kg);
+
+        kd.cod_alm := kg.cod_alm;
+        kd.tp_transac := kg.tp_transac;
+        kd.serie := kg.serie;
+        kd.numero := kg.numero;
+        kd.cod_art := af.cod_activo_fijo;
+        kd.cantidad := 1;
+        kd.costo_s := 0;
+        kd.costo_d := 0;
+        kd.fch_transac := SYSDATE;
+        kd.por_desc1 := 0;
+        kd.por_desc2 := 0;
+        kd.imp_vvb := 0;
+        kd.estado := 0;
+        kd.origen := 'P';
+        kd.ing_sal := 'S';
+        kd.pr_referencia := 'ACTIVACION ACTIVO FIJO';
+
+        api_kardex_d.ins(kd);
+    END;
+
     PROCEDURE activa_activo_fijo(ot IN OUT ot_mantto%ROWTYPE, af IN OUT activo_fijo%ROWTYPE, fch DATE) IS
     BEGIN
         af.fecha_activacion := fch;
@@ -259,8 +305,9 @@ CREATE OR REPLACE PACKAGE BODY otm AS
         af.otm_serie := ot.id_serie;
         af.otm_numero := ot.id_numero;
         af.cod_estado := 1;
+        saca_del_almacen(af, fch);
         api_activo_fijo.upd(af);
-        otm_asiento.activacion(ot, af, fch);
+        otm_asiento.activacion(ot, af, trunc(fch));
     END;
 
     PROCEDURE activa_servicio_instalacion(ot IN OUT ot_mantto%ROWTYPE, fch DATE) IS
@@ -311,6 +358,10 @@ CREATE OR REPLACE PACKAGE BODY otm AS
         ot.fecha_cierre := fch;
         ot.usuario_cierre := user;
         ot.registro_contable := otm_cst.activo;
+        ot.total_servicio_soles := servicio.soles;
+        ot.total_servicio_dolares := servicio.dolares;
+        ot.total_repuesto_soles := repuesto.soles;
+        ot.total_repuesto_dolares := repuesto.dolares;
         ot.total_soles := ot.total_activo_soles + servicio.soles + repuesto.soles;
         ot.total_dolares := ot.total_activo_dolares + servicio.dolares + repuesto.dolares;
         api_ot_mantto.upd(ot);
@@ -352,8 +403,8 @@ CREATE OR REPLACE PACKAGE BODY otm AS
         CASE opcion
             WHEN otm_cst.activo THEN
                 valida_activacion(af, ot);
-                es_mantenimiento := ot.id_modo = 'MAN';
-                es_instalacion := ot.id_modo = 'INS';
+                es_mantenimiento := ot.id_modo = otm_cst.mantenimiento;
+                es_instalacion := ot.id_modo = otm_cst.instalacion;
 
                 IF es_mantenimiento THEN
                     activa_mantenimiento(ot, fch);
@@ -368,4 +419,6 @@ CREATE OR REPLACE PACKAGE BODY otm AS
 
         COMMIT;
     END;
+BEGIN
+    param := api_paramaf.onerow();
 END otm;
