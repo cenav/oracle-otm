@@ -135,7 +135,7 @@ CREATE OR REPLACE PACKAGE BODY otm AS
         mail.texto := 'Se ha activado la siguiente OTM:' || chr(10) || chr(10);
         mail.texto := rtrim(mail.texto) || 'Código: ' || af.cod_activo_fijo || chr(10);
         mail.texto := rtrim(mail.texto) || 'Descripción: ' || af.descripcion || chr(10);
-        mail.texto := rtrim(mail.texto) || 'OTM: ' || af.ref_tipo || s || af.ref_serie || s || af.ref_numero || chr(10);
+        mail.texto := rtrim(mail.texto) || 'OTM: ' || af.otm_tipo || s || af.otm_serie || s || af.otm_numero || chr(10);
         mail.texto := rtrim(mail.texto) || 'Fecha activación: ' || af.fecha_activacion || chr(10);
         mail.texto := rtrim(mail.texto) || 'Asiento Contable: ' || asiento.ano || s || asiento.mes || s ||
                       asiento.libro || s || asiento.voucher || chr(10);
@@ -145,7 +145,7 @@ CREATE OR REPLACE PACKAGE BODY otm AS
         END LOOP;
     END;
 
-    PROCEDURE correo_gasto(ot ot_mantto%ROWTYPE) IS
+    PROCEDURE envia_correo_gasto(ot ot_mantto%ROWTYPE) IS
         CURSOR cr_correos IS
             SELECT correo
               FROM notificacion
@@ -166,6 +166,33 @@ CREATE OR REPLACE PACKAGE BODY otm AS
         mail.texto := rtrim(mail.texto) || 'Descripción: ' || NVL(mq.abreviatura, mq.descripcion) || chr(10);
         mail.texto := rtrim(mail.texto) || 'Asiento Contable: ' || ot.cierre_ano || s || ot.cierre_mes || s ||
                       ot.cierre_libro || s || ot.cierre_voucher || chr(10);
+
+        FOR r IN cr_correos LOOP
+            enviar_correo(mail.de, r.correo, mail.asunto, mail.texto);
+        END LOOP;
+    END;
+
+    PROCEDURE envia_correo_instalacion(af activo_fijo%ROWTYPE) IS
+        CURSOR cr_correos IS
+            SELECT correo
+              FROM notificacion
+             WHERE sistema = 'ACTIVO_FIJO'
+               AND proceso = 'ACTIVACION';
+
+        mail pkg_types.CORREO;
+        s VARCHAR2(10) := '-';
+        asiento activo_fijo_asiento%ROWTYPE;
+    BEGIN
+        asiento := api_activo_fijo_asiento.ONEROW(af.cod_activo_fijo, 'ACTIVO');
+        mail.asunto := 'Instalación de activo fijo ' || af.cod_activo_fijo;
+        mail.de := 'sistemas@pevisa.com.pe';
+        mail.texto := 'Se ha instalado el siguiente activo fijo:' || chr(10) || chr(10);
+        mail.texto := rtrim(mail.texto) || 'Código: ' || af.cod_activo_fijo || chr(10);
+        mail.texto := rtrim(mail.texto) || 'Descripción: ' || af.descripcion || chr(10);
+        mail.texto := rtrim(mail.texto) || 'OTM: ' || af.otm_tipo || s || af.otm_serie || s || af.otm_numero || chr(10);
+        mail.texto := rtrim(mail.texto) || 'Fecha activación: ' || af.fecha_activacion || chr(10);
+        mail.texto := rtrim(mail.texto) || 'Asiento Contable: ' || asiento.ano || s || asiento.mes || s ||
+                      asiento.libro || s || asiento.voucher || chr(10);
 
         FOR r IN cr_correos LOOP
             enviar_correo(mail.de, r.correo, mail.asunto, mail.texto);
@@ -375,7 +402,7 @@ CREATE OR REPLACE PACKAGE BODY otm AS
         activa_activo_fijo(ot, af, fch);
         activa_servicio_instalacion(ot, fch);
         cierra_orden(ot, fch);
-        envia_correo_activacion(af);
+        envia_correo_instalacion(af);
     END;
 
     PROCEDURE envia_al_gasto(ot IN OUT ot_mantto%ROWTYPE, fch DATE) IS
@@ -385,7 +412,7 @@ CREATE OR REPLACE PACKAGE BODY otm AS
         IF val.soles > 0 THEN
             otm_asiento.gasto(ot, trunc(fch));
         END IF;
-        correo_gasto(ot);
+        envia_correo_gasto(ot);
         ot.estado := '8';
         ot.fecha_cierre := fch;
         ot.usuario_cierre := user;
@@ -420,7 +447,7 @@ CREATE OR REPLACE PACKAGE BODY otm AS
                 END IF;
             WHEN otm_cst.gasto THEN
                 envia_al_gasto(ot, fch);
-            END CASE;
+        END CASE;
 
         COMMIT;
     END;
