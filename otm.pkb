@@ -381,13 +381,15 @@ CREATE OR REPLACE PACKAGE BODY otm AS
     PROCEDURE envia_al_gasto(ot IN OUT ot_mantto%ROWTYPE, fch DATE) IS
         val T_VALOR;
     BEGIN
-        otm_asiento.gasto(ot, trunc(fch));
+        val := valor_total(ot.id_tipo, ot.id_serie, ot.id_numero);
+        IF val.soles > 0 THEN
+            otm_asiento.gasto(ot, trunc(fch));
+        END IF;
         correo_gasto(ot);
         ot.estado := '8';
         ot.fecha_cierre := fch;
         ot.usuario_cierre := user;
         ot.registro_contable := otm_cst.gasto;
-        val := valor_total(ot.id_tipo, ot.id_serie, ot.id_numero);
         ot.total_soles := val.soles;
         ot.total_dolares := val.dolares;
         api_ot_mantto.upd(ot);
