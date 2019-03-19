@@ -10,4 +10,9 @@ CREATE OR REPLACE PACKAGE otm_err AS
     en_revisar_estado    CONSTANT INTEGER := -20002;
     em_revisar_estado    CONSTANT msg := 'Revise el estado de la OTM para poder cerrarla';
     PRAGMA EXCEPTION_INIT (ex_revisar_estado, -20002);
+        
+    ex_instalacion_sin_valor    EXCEPTION;
+    en_instalacion_sin_valor    CONSTANT INTEGER := -20003;
+    em_instalacion_sin_valor    CONSTANT msg := 'El valor de la instalación no puede ser 0';
+    PRAGMA EXCEPTION_INIT (ex_instalacion_sin_valor, -20003);
 END otm_err;

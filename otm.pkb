@@ -136,7 +136,7 @@ CREATE OR REPLACE PACKAGE BODY otm AS
         mail.texto := rtrim(mail.texto) || 'Código: ' || af.cod_activo_fijo || chr(10);
         mail.texto := rtrim(mail.texto) || 'Descripción: ' || af.descripcion || chr(10);
         mail.texto := rtrim(mail.texto) || 'OTM: ' || af.otm_tipo || s || af.otm_serie || s || af.otm_numero || chr(10);
-        mail.texto := rtrim(mail.texto) || 'Fecha activación: ' || af.fecha_activacion || chr(10);
+        mail.texto := rtrim(mail.texto) || 'Fecha activación: ' || to_char(af.fecha_activacion, 'DD/MM/YYYY') || chr(10);
         mail.texto := rtrim(mail.texto) || 'Asiento Contable: ' || asiento.ano || s || asiento.mes || s ||
                       asiento.libro || s || asiento.voucher || chr(10);
 
@@ -190,7 +190,7 @@ CREATE OR REPLACE PACKAGE BODY otm AS
         mail.texto := rtrim(mail.texto) || 'Código: ' || af.cod_activo_fijo || chr(10);
         mail.texto := rtrim(mail.texto) || 'Descripción: ' || af.descripcion || chr(10);
         mail.texto := rtrim(mail.texto) || 'OTM: ' || af.otm_tipo || s || af.otm_serie || s || af.otm_numero || chr(10);
-        mail.texto := rtrim(mail.texto) || 'Fecha activación: ' || af.fecha_activacion || chr(10);
+        mail.texto := rtrim(mail.texto) || 'Fecha activación: ' || to_char(af.fecha_activacion, 'DD/MM/YYYY') || chr(10);
         mail.texto := rtrim(mail.texto) || 'Asiento Contable: ' || asiento.ano || s || asiento.mes || s ||
                       asiento.libro || s || asiento.voucher || chr(10);
 
@@ -202,11 +202,13 @@ CREATE OR REPLACE PACKAGE BODY otm AS
     PROCEDURE valida_activacion(af activo_fijo%ROWTYPE, ot ot_mantto%ROWTYPE) IS
         d CONSTANT VARCHAR2(10) := ' ';
     BEGIN
-        IF af.cod_activo_fijo IS NULL THEN
+        IF af.cod_activo_fijo IS NULL
+        THEN
             raise_application_error(otm_err.en_afijo_existe, otm_err.em_afijo_existe || d || af.cod_activo_fijo);
         END IF;
 
-        IF NOT otm_qry.en_curso(ot.estado) THEN
+        IF NOT otm_qry.en_curso(ot.estado)
+        THEN
             raise_application_error(otm_err.en_revisar_estado, otm_err.em_revisar_estado);
         END IF;
     END;
@@ -347,35 +349,41 @@ CREATE OR REPLACE PACKAGE BODY otm AS
         servicio T_VALOR;
         repuesto T_VALOR;
     BEGIN
-        correlativo := pkg_activo_fijo.correlativo_subclase(ot.id_activo_fijo, subclase);
-        af.cod_activo_fijo := ot.id_activo_fijo || ' ' || subclase || correlativo;
-        af.descripcion :=
-                'INSTALACION DE MAQUINA ' || ot.id_activo_fijo || ' OTM ' || ot.id_serie || '-' || ot.id_numero;
-        af.cod_estado := '1';
-        af.cod_clase := 'MAQ';
-        af.cod_subclase := subclase;
-        af.centro_costo := ot.centro_costo;
-        af.tangible_intangible := 'I';
-        af.cod_tipo_adquisicion := 'PROPIO';
         servicio := valor_servicio(ot.id_tipo, ot.id_serie, ot.id_numero);
         repuesto := valor_repuesto(ot.id_tipo, ot.id_serie, ot.id_numero);
-        af.valor_adquisicion_s := servicio.soles + repuesto.soles;
-        af.valor_adquisicion_d := servicio.dolares + repuesto.dolares;
-        af.moneda_adquisicion := 'S';
-        af.otm_tipo := ot.id_tipo;
-        af.otm_serie := ot.id_serie;
-        af.otm_numero := ot.id_numero;
-        af.cod_metodo_deprec := 'LIN';
-        af.porcentaje_nif := 10;
-        af.porcentaje_tributario := 10;
-        af.porcentaje_precios := 10;
-        af.cod_adicion := ot.id_activo_fijo;
-        af.fecha_adquisicion := fch;
-        af.fecha_activacion := fch;
-        af.depreciable := 'S';
 
-        api_activo_fijo.ins(af);
-        otm_asiento.activacion(ot, af, trunc(fch));
+        IF servicio.soles + repuesto.soles > 0 THEN
+            correlativo := pkg_activo_fijo.correlativo_subclase(ot.id_activo_fijo, subclase);
+            af.cod_activo_fijo := ot.id_activo_fijo || ' ' || subclase || correlativo;
+            af.descripcion :=
+                    'INSTALACION DE MAQUINA ' || ot.id_activo_fijo || ' OTM ' || ot.id_serie || '-' || ot.id_numero;
+            af.cod_estado := '1';
+            af.cod_clase := 'MAQ';
+            af.cod_subclase := subclase;
+            af.centro_costo := ot.centro_costo;
+            af.tangible_intangible := 'I';
+            af.cod_tipo_adquisicion := 'PROPIO';
+            af.valor_adquisicion_s := servicio.soles + repuesto.soles;
+            af.valor_adquisicion_d := servicio.dolares + repuesto.dolares;
+            af.moneda_adquisicion := 'S';
+            af.otm_tipo := ot.id_tipo;
+            af.otm_serie := ot.id_serie;
+            af.otm_numero := ot.id_numero;
+            af.cod_metodo_deprec := 'LIN';
+            af.porcentaje_nif := 10;
+            af.porcentaje_tributario := 10;
+            af.porcentaje_precios := 10;
+            af.cod_adicion := ot.id_activo_fijo;
+            af.fecha_adquisicion := fch;
+            af.fecha_activacion := fch;
+            af.depreciable := 'S';
+
+            api_activo_fijo.ins(af);
+            otm_asiento.activacion(ot, af, trunc(fch));
+        ELSE
+            raise_application_error(otm_err.en_instalacion_sin_valor, otm_err.em_instalacion_sin_valor);
+        END IF;
+
     END;
 
     PROCEDURE cierra_orden(ot IN OUT ot_mantto%ROWTYPE, fch DATE) IS
