@@ -264,6 +264,7 @@ CREATE OR REPLACE PACKAGE BODY otm AS
         af.fecha_adquisicion := fch;
         af.fecha_activacion := fch;
         af.depreciable := 'S';
+        af.origen := 'NAC';
 
         api_activo_fijo.ins(af);
         otm_asiento.activacion(ot, af, trunc(fch));
@@ -377,6 +378,7 @@ CREATE OR REPLACE PACKAGE BODY otm AS
             af.fecha_adquisicion := fch;
             af.fecha_activacion := fch;
             af.depreciable := 'S';
+            af.origen := 'NAC';
 
             api_activo_fijo.ins(af);
             otm_asiento.activacion(ot, af, trunc(fch));
