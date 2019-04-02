@@ -256,10 +256,12 @@ CREATE OR REPLACE PACKAGE BODY otm AS
         af.otm_tipo := ot.id_tipo;
         af.otm_serie := ot.id_serie;
         af.otm_numero := ot.id_numero;
+        af.valor_residual_s := 0;
+        af.valor_residual_d := 0;
         af.cod_metodo_deprec := 'LIN';
-        af.porcentaje_nif := 10;
-        af.porcentaje_tributario := 10;
-        af.porcentaje_precios := 10;
+        af.porcentaje_nif := param.porc_niif;
+        af.porcentaje_tributario := param.porc_tributario;
+        af.porcentaje_precios := param.porc_tributario;
         af.cod_adicion := ot.id_activo_fijo;
         af.fecha_adquisicion := fch;
         af.fecha_activacion := fch;
@@ -371,9 +373,9 @@ CREATE OR REPLACE PACKAGE BODY otm AS
             af.otm_serie := ot.id_serie;
             af.otm_numero := ot.id_numero;
             af.cod_metodo_deprec := 'LIN';
-            af.porcentaje_nif := 10;
-            af.porcentaje_tributario := 10;
-            af.porcentaje_precios := 10;
+            af.porcentaje_nif := param.porc_niif;
+            af.porcentaje_tributario := param.porc_tributario;
+            af.porcentaje_precios := param.porc_precios;
             af.cod_adicion := ot.id_activo_fijo;
             af.fecha_adquisicion := fch;
             af.fecha_activacion := fch;
@@ -457,10 +459,10 @@ CREATE OR REPLACE PACKAGE BODY otm AS
                 END IF;
             WHEN otm_cst.gasto THEN
                 envia_al_gasto(ot, fch);
-        END CASE;
+            END CASE;
 
         COMMIT;
     END;
-BEGIN
+    BEGIN
     param := api_paramaf.onerow();
 END otm;
