@@ -54,7 +54,10 @@ CREATE OR REPLACE PACKAGE BODY otm_asiento AS
             md.voucher := g_voucher;
             md.cuenta := g_param.cuenta_maquina_activo;
             md.tipo_cambio := pkg_asiento.c_tipo_cambio;
+            md.tipo_relacion := 'U';
             md.relacion := af.centro_costo;
+            md.tipo_referencia := '00';
+            md.serie := '0000';
             md.nro_referencia := af.cod_activo_fijo;
             md.fecha := fch;
             md.detalle := ot.id_serie || '-' || ot.id_numero;
@@ -85,6 +88,8 @@ CREATE OR REPLACE PACKAGE BODY otm_asiento AS
             md.tipo_cambio := pkg_asiento.c_tipo_cambio;
             md.tipo_relacion := 'U';
             md.relacion := af.centro_costo;
+            md.tipo_referencia := '00';
+            md.serie := '0000';
             md.nro_referencia := af.cod_activo_fijo;
             md.fecha := fch;
             md.detalle := ot.id_serie || '-' || ot.id_numero;
@@ -193,7 +198,11 @@ CREATE OR REPLACE PACKAGE BODY otm_asiento AS
             md.voucher := g_voucher;
             md.cuenta := g_param.cuenta_maquina_gasto;
             md.tipo_cambio := pkg_asiento.c_tipo_cambio;
+            md.tipo_relacion := 'U';
             md.relacion := ot.centro_costo;
+            md.tipo_referencia := '00';
+            md.serie := '0000';
+            md.nro_referencia := ot.id_activo_fijo;
             md.fecha := fch;
             md.detalle := ot.id_serie || '-' || ot.id_numero;
             md.cargo_s := val.soles;
@@ -223,6 +232,8 @@ CREATE OR REPLACE PACKAGE BODY otm_asiento AS
             md.tipo_cambio := pkg_asiento.c_tipo_cambio;
             md.tipo_relacion := 'U';
             md.relacion := ot.centro_costo;
+            md.tipo_referencia := '00';
+            md.serie := '0000';
             md.nro_referencia := ot.id_activo_fijo;
             md.fecha := fch;
             md.detalle := ot.id_serie || '-' || ot.id_numero;
