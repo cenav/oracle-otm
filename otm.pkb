@@ -232,17 +232,25 @@ CREATE OR REPLACE PACKAGE BODY otm AS
         RETURN opcion;
     END;
 
-    PROCEDURE activa_mantenimiento(ot IN OUT ot_mantto%ROWTYPE, fch DATE) IS
+    PROCEDURE activa_mantenimiento(ot IN OUT ot_mantto%ROWTYPE, a activo_fijo%ROWTYPE, fch DATE) IS
         d CONSTANT VARCHAR2(30) := '-';
         subclase CONSTANT VARCHAR2(3) := 'MAN';
         correlativo PLS_INTEGER := 0;
         af activo_fijo%ROWTYPE;
+        cod_activo activo_fijo.cod_activo_fijo%TYPE;
         val T_VALOR;
+        es_submaquina_referencial BOOLEAN;
     BEGIN
-        correlativo := pkg_activo_fijo.correlativo_subclase(ot.id_activo_fijo, subclase);
-        af.cod_activo_fijo := ot.id_activo_fijo || ' ' || subclase || correlativo;
+        es_submaquina_referencial := a.depreciable = 'N' AND a.cod_adicion IS NOT NULL;
+        IF es_submaquina_referencial THEN
+            cod_activo := a.cod_adicion; -- asigna al padre
+        ELSE
+            cod_activo := a.cod_activo_fijo;
+        END IF;
+        correlativo := pkg_activo_fijo.correlativo_subclase(cod_activo, subclase);
+        af.cod_activo_fijo := cod_activo || ' ' || subclase || correlativo;
         af.descripcion :=
-                'MANTENIMIENTO DE MAQUINA ' || ot.id_activo_fijo || ' OTM ' || ot.id_serie || d || ot.id_numero;
+                    'MANTENIMIENTO DE MAQUINA ' || cod_activo || ' OTM ' || ot.id_serie || d || ot.id_numero;
         af.cod_estado := '1';
         af.cod_clase := 'MAQ';
         af.cod_subclase := subclase;
@@ -262,7 +270,7 @@ CREATE OR REPLACE PACKAGE BODY otm AS
         af.porcentaje_nif := param.porc_niif;
         af.porcentaje_tributario := param.porc_tributario;
         af.porcentaje_precios := param.porc_tributario;
-        af.cod_adicion := ot.id_activo_fijo;
+        af.cod_adicion := cod_activo;
         af.fecha_adquisicion := fch;
         af.fecha_activacion := fch;
         af.depreciable := 'S';
@@ -359,7 +367,7 @@ CREATE OR REPLACE PACKAGE BODY otm AS
             correlativo := pkg_activo_fijo.correlativo_subclase(ot.id_activo_fijo, subclase);
             af.cod_activo_fijo := ot.id_activo_fijo || ' ' || subclase || correlativo;
             af.descripcion :=
-                    'INSTALACION DE MAQUINA ' || ot.id_activo_fijo || ' OTM ' || ot.id_serie || '-' || ot.id_numero;
+                        'INSTALACION DE MAQUINA ' || ot.id_activo_fijo || ' OTM ' || ot.id_serie || '-' || ot.id_numero;
             af.cod_estado := '1';
             af.cod_clase := 'MAQ';
             af.cod_subclase := subclase;
@@ -451,7 +459,7 @@ CREATE OR REPLACE PACKAGE BODY otm AS
                 es_instalacion := ot.id_modo = otm_cst.instalacion;
 
                 IF es_mantenimiento THEN
-                    activa_mantenimiento(ot, fch);
+                    activa_mantenimiento(ot, af, fch);
                 END IF;
 
                 IF es_instalacion THEN
