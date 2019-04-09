@@ -232,7 +232,7 @@ CREATE OR REPLACE PACKAGE BODY otm AS
         RETURN opcion;
     END;
 
-    PROCEDURE activa_mantenimiento(ot IN OUT ot_mantto%ROWTYPE, a activo_fijo%ROWTYPE, fch DATE) IS
+    PROCEDURE activa_mantenimiento(ot IN OUT ot_mantto%ROWTYPE, padre activo_fijo%ROWTYPE, fch DATE) IS
         d CONSTANT VARCHAR2(30) := '-';
         subclase CONSTANT VARCHAR2(3) := 'MAN';
         correlativo PLS_INTEGER := 0;
@@ -241,11 +241,11 @@ CREATE OR REPLACE PACKAGE BODY otm AS
         val T_VALOR;
         es_submaquina_referencial BOOLEAN;
     BEGIN
-        es_submaquina_referencial := a.depreciable = 'N' AND a.cod_adicion IS NOT NULL;
+        es_submaquina_referencial := padre.depreciable = 'N' AND padre.cod_adicion IS NOT NULL;
         IF es_submaquina_referencial THEN
-            cod_activo := a.cod_adicion; -- asigna al padre
+            cod_activo := padre.cod_adicion; -- asigna al padre
         ELSE
-            cod_activo := a.cod_activo_fijo;
+            cod_activo := padre.cod_activo_fijo;
         END IF;
         correlativo := pkg_activo_fijo.correlativo_subclase(cod_activo, subclase);
         af.cod_activo_fijo := cod_activo || ' ' || subclase || correlativo;
@@ -255,6 +255,7 @@ CREATE OR REPLACE PACKAGE BODY otm AS
         af.cod_clase := 'MAQ';
         af.cod_subclase := subclase;
         af.centro_costo := ot.centro_costo;
+        af.cuenta_contable := padre.cuenta_contable;
         af.tangible_intangible := 'I';
         af.cod_tipo_adquisicion := 'PROPIO';
         val := valor_total(ot.id_tipo, ot.id_serie, ot.id_numero);
@@ -353,7 +354,7 @@ CREATE OR REPLACE PACKAGE BODY otm AS
         otm_asiento.activacion(ot, af, trunc(fch));
     END;
 
-    PROCEDURE activa_servicio_instalacion(ot IN OUT ot_mantto%ROWTYPE, fch DATE) IS
+    PROCEDURE activa_servicio_instalacion(ot IN OUT ot_mantto%ROWTYPE, padre activo_fijo%ROWTYPE, fch DATE) IS
         subclase CONSTANT VARCHAR2(3) := 'INS';
         correlativo PLS_INTEGER := 0;
         af activo_fijo%ROWTYPE;
@@ -372,6 +373,7 @@ CREATE OR REPLACE PACKAGE BODY otm AS
             af.cod_clase := 'MAQ';
             af.cod_subclase := subclase;
             af.centro_costo := ot.centro_costo;
+            af.cuenta_contable := padre.cuenta_contable;
             af.tangible_intangible := 'I';
             af.cod_tipo_adquisicion := 'PROPIO';
             af.valor_adquisicion_s := servicio.soles + repuesto.soles;
@@ -384,7 +386,7 @@ CREATE OR REPLACE PACKAGE BODY otm AS
             af.porcentaje_nif := param.porc_niif;
             af.porcentaje_tributario := param.porc_tributario;
             af.porcentaje_precios := param.porc_precios;
-            af.cod_adicion := ot.id_activo_fijo;
+            af.cod_adicion := padre.cod_activo_fijo;
             af.fecha_adquisicion := fch;
             af.fecha_activacion := fch;
             af.depreciable := 'S';
@@ -420,7 +422,7 @@ CREATE OR REPLACE PACKAGE BODY otm AS
     PROCEDURE activa_instalacion(ot IN OUT ot_mantto%ROWTYPE, af IN OUT activo_fijo%ROWTYPE, fch DATE) IS
     BEGIN
         activa_activo_fijo(ot, af, fch);
-        activa_servicio_instalacion(ot, fch);
+        activa_servicio_instalacion(ot, af, fch);
         cierra_orden(ot, fch);
         envia_correo_instalacion(af);
     END;
