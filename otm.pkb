@@ -244,8 +244,10 @@ CREATE OR REPLACE PACKAGE BODY otm AS
         es_submaquina_referencial := padre.depreciable = 'N' AND padre.cod_adicion IS NOT NULL;
         IF es_submaquina_referencial THEN
             cod_activo := padre.cod_adicion; -- asigna al padre
+            af.cuenta_contable := api_activo_fijo.ONEROW(padre.cod_adicion).cuenta_contable;
         ELSE
             cod_activo := padre.cod_activo_fijo;
+            af.cuenta_contable := padre.cuenta_contable;
         END IF;
         correlativo := pkg_activo_fijo.correlativo_subclase(cod_activo, subclase);
         af.cod_activo_fijo := cod_activo || ' ' || subclase || correlativo;
@@ -255,7 +257,6 @@ CREATE OR REPLACE PACKAGE BODY otm AS
         af.cod_clase := 'MAQ';
         af.cod_subclase := subclase;
         af.centro_costo := ot.centro_costo;
-        af.cuenta_contable := padre.cuenta_contable;
         af.tangible_intangible := 'I';
         af.cod_tipo_adquisicion := 'PROPIO';
         val := valor_total(ot.id_tipo, ot.id_serie, ot.id_numero);
