@@ -7,14 +7,14 @@ CREATE OR REPLACE PACKAGE BODY otm AS
               FROM vw_mantto_preventivo_hoy
              WHERE prox_fecha_mantto = TRUNC(SYSDATE);
 
-        mail pkg_types.MAXVARCHAR2;
-        existe_registro BOOLEAN := FALSE ;
-        s VARCHAR2(1) := ' ';
-        m PLS_INTEGER := 20;
-        n PLS_INTEGER := 40;
-        o PLS_INTEGER := 80;
-        f PLS_INTEGER := 10;
-        i PLS_INTEGER := 9;
+        mail            pkg_types.MAXVARCHAR2;
+        existe_registro BOOLEAN     := FALSE ;
+        s               VARCHAR2(1) := ' ';
+        m               PLS_INTEGER := 20;
+        n               PLS_INTEGER := 40;
+        o               PLS_INTEGER := 80;
+        f               PLS_INTEGER := 10;
+        i               PLS_INTEGER := 9;
     BEGIN
         mail := 'Estos son los mantenimientos preventivos para el dia de hoy ' ||
                 to_char(sysdate, 'dd/mm/yyyy') ||
@@ -118,6 +118,11 @@ CREATE OR REPLACE PACKAGE BODY otm AS
         RETURN c > 0;
     END;
 
+    FUNCTION en_curso(estado ot_mantto.estado%TYPE) RETURN BOOLEAN IS
+    BEGIN
+        RETURN estado = 3;
+    END;
+
     PROCEDURE envia_correo_activacion(af activo_fijo%ROWTYPE) IS
         CURSOR cr_correos IS
             SELECT correo
@@ -125,8 +130,8 @@ CREATE OR REPLACE PACKAGE BODY otm AS
              WHERE sistema = 'ACTIVO_FIJO'
                AND proceso = 'ACTIVACION';
 
-        mail pkg_types.CORREO;
-        s VARCHAR2(10) := '-';
+        mail    pkg_types.CORREO;
+        s       VARCHAR2(10) := '-';
         asiento activo_fijo_asiento%ROWTYPE;
     BEGIN
         asiento := api_activo_fijo_asiento.ONEROW(af.cod_activo_fijo, 'ACTIVO');
@@ -145,33 +150,6 @@ CREATE OR REPLACE PACKAGE BODY otm AS
         END LOOP;
     END;
 
-    PROCEDURE envia_correo_gasto(ot ot_mantto%ROWTYPE) IS
-        CURSOR cr_correos IS
-            SELECT correo
-              FROM notificacion
-             WHERE sistema = 'ACTIVO_FIJO'
-               AND proceso = 'ACTIVACION';
-
-        mail pkg_types.CORREO;
-        s VARCHAR2(10) := '-';
-        asiento activo_fijo_asiento%ROWTYPE;
-        mq pr_tabmaq%ROWTYPE;
-    BEGIN
-        mail.asunto := 'Cierre de OTM envio al gasto ' || ot.id_activo_fijo;
-        mail.de := 'sistemas@pevisa.com.pe';
-        mail.texto := 'Se ha enviado al gasto la siguiente OTM:' || chr(10) || chr(10);
-        mail.texto := rtrim(mail.texto) || 'OTM: ' || ot.id_tipo || s || ot.id_serie || s || ot.id_numero || chr(10);
-        mail.texto := rtrim(mail.texto) || 'Máquina: ' || ot.id_activo_fijo || chr(10);
-        mq := api_pr_tabmaq.ONEROW(ot.id_activo_fijo);
-        mail.texto := rtrim(mail.texto) || 'Descripción: ' || NVL(mq.abreviatura, mq.descripcion) || chr(10);
-        mail.texto := rtrim(mail.texto) || 'Asiento Contable: ' || ot.cierre_ano || s || ot.cierre_mes || s ||
-                      ot.cierre_libro || s || ot.cierre_voucher || chr(10);
-
-        FOR r IN cr_correos LOOP
-            enviar_correo(mail.de, r.correo, mail.asunto, mail.texto);
-        END LOOP;
-    END;
-
     PROCEDURE envia_correo_instalacion(af activo_fijo%ROWTYPE) IS
         CURSOR cr_correos IS
             SELECT correo
@@ -179,8 +157,8 @@ CREATE OR REPLACE PACKAGE BODY otm AS
              WHERE sistema = 'ACTIVO_FIJO'
                AND proceso = 'ACTIVACION';
 
-        mail pkg_types.CORREO;
-        s VARCHAR2(10) := '-';
+        mail    pkg_types.CORREO;
+        s       VARCHAR2(10) := '-';
         asiento activo_fijo_asiento%ROWTYPE;
     BEGIN
         asiento := api_activo_fijo_asiento.ONEROW(af.cod_activo_fijo, 'ACTIVO');
@@ -202,43 +180,41 @@ CREATE OR REPLACE PACKAGE BODY otm AS
     PROCEDURE valida_activacion(af activo_fijo%ROWTYPE, ot ot_mantto%ROWTYPE) IS
         d CONSTANT VARCHAR2(10) := ' ';
     BEGIN
-        IF af.cod_activo_fijo IS NULL
-        THEN
-            raise_application_error(otm_err.en_afijo_existe, otm_err.em_afijo_existe || d || af.cod_activo_fijo);
+        IF af.cod_activo_fijo IS NULL THEN
+            raise_application_error(otcomun.en_afijo_existe, otcomun.em_afijo_existe || d || af.cod_activo_fijo);
         END IF;
 
-        IF NOT otm_qry.en_curso(ot.estado)
-        THEN
-            raise_application_error(otm_err.en_revisar_estado, otm_err.em_revisar_estado);
+        IF NOT en_curso(ot.estado) THEN
+            raise_application_error(otcomun.en_revisar_estado, otcomun.em_revisar_estado);
         END IF;
     END;
 
     FUNCTION opcion_activacion(tpo ot_mantto.id_tipo%TYPE, ser ot_mantto.id_serie%TYPE,
                                num ot_mantto.id_numero%TYPE) RETURN VARCHAR2 IS
-        val T_VALOR;
+        val    T_VALOR;
         opcion VARCHAR2(30);
     BEGIN
         val := valor_total(tpo, ser, num);
 
         CASE
             WHEN val.soles >= param.rango_min_activo THEN
-                opcion := otm_cst.activo;
+                opcion := otcomun.k_gasto;
             WHEN val.soles <= param.rango_max_gasto THEN
-                opcion := otm_cst.gasto;
+                opcion := otcomun.k_gasto;
             ELSE
-                opcion := otm_cst.gasto;
+                opcion := otcomun.k_gasto;
             END CASE;
 
         RETURN opcion;
     END;
 
     PROCEDURE activa_mantenimiento(ot IN OUT ot_mantto%ROWTYPE, padre activo_fijo%ROWTYPE, fch DATE) IS
-        d CONSTANT VARCHAR2(30) := '-';
-        subclase CONSTANT VARCHAR2(3) := 'MAN';
-        correlativo PLS_INTEGER := 0;
-        af activo_fijo%ROWTYPE;
-        cod_activo activo_fijo.cod_activo_fijo%TYPE;
-        val T_VALOR;
+        d CONSTANT                VARCHAR2(30) := '-';
+        subclase CONSTANT         VARCHAR2(3)  := 'MAN';
+        correlativo               PLS_INTEGER  := 0;
+        af                        activo_fijo%ROWTYPE;
+        cod_activo                activo_fijo.cod_activo_fijo%TYPE;
+        val                       T_VALOR;
         es_submaquina_referencial BOOLEAN;
     BEGIN
         es_submaquina_referencial := padre.depreciable = 'N' AND padre.cod_adicion IS NOT NULL;
@@ -284,7 +260,7 @@ CREATE OR REPLACE PACKAGE BODY otm AS
         ot.estado := 8;
         ot.fecha_cierre := fch;
         ot.usuario_cierre := user;
-        ot.registro_contable := otm_cst.activo;
+        ot.registro_contable := otcomun.k_activo;
         ot.total_soles := val.soles;
         ot.total_dolares := val.dolares;
         api_ot_mantto.upd(ot);
@@ -297,9 +273,9 @@ CREATE OR REPLACE PACKAGE BODY otm AS
         kd kardex_d%ROWTYPE;
     BEGIN
         kg.cod_alm := param.almacen_activo_fijo;
-        kg.tp_transac := otm_cst.salida_transac;
-        kg.serie := otm_cst.salida_serie;
-        kg.numero := api_kardex_g.next_numero(otm_cst.salida_transac, otm_cst.salida_serie);
+        kg.tp_transac := otcomun.k_salida_transac;
+        kg.serie := otcomun.k_salida_serie;
+        kg.numero := api_kardex_g.next_numero(otcomun.k_salida_transac, otcomun.k_salida_serie);
         kg.fch_transac := fch;
         kg.tip_doc_ref := af.otm_tipo;
         kg.ser_doc_ref := af.otm_serie;
@@ -357,10 +333,10 @@ CREATE OR REPLACE PACKAGE BODY otm AS
 
     PROCEDURE activa_servicio_instalacion(ot IN OUT ot_mantto%ROWTYPE, padre activo_fijo%ROWTYPE, fch DATE) IS
         subclase CONSTANT VARCHAR2(3) := 'INS';
-        correlativo PLS_INTEGER := 0;
-        af activo_fijo%ROWTYPE;
-        servicio T_VALOR;
-        repuesto T_VALOR;
+        correlativo       PLS_INTEGER := 0;
+        af                activo_fijo%ROWTYPE;
+        servicio          T_VALOR;
+        repuesto          T_VALOR;
     BEGIN
         servicio := valor_servicio(ot.id_tipo, ot.id_serie, ot.id_numero);
         repuesto := valor_repuesto(ot.id_tipo, ot.id_serie, ot.id_numero);
@@ -395,8 +371,8 @@ CREATE OR REPLACE PACKAGE BODY otm AS
 
             api_activo_fijo.ins(af);
             otm_asiento.activacion(ot, af, trunc(fch));
-         ELSE
-             raise_application_error(otm_err.en_instalacion_sin_valor, otm_err.em_instalacion_sin_valor);
+        ELSE
+            raise_application_error(otm_err.en_instalacion_sin_valor, otm_err.em_instalacion_sin_valor);
         END IF;
 
     END;
@@ -410,7 +386,7 @@ CREATE OR REPLACE PACKAGE BODY otm AS
         ot.estado := 8;
         ot.fecha_cierre := fch;
         ot.usuario_cierre := user;
-        ot.registro_contable := otm_cst.activo;
+        ot.registro_contable := otcomun.k_activo;
         ot.total_servicio_soles := servicio.soles;
         ot.total_servicio_dolares := servicio.dolares;
         ot.total_repuesto_soles := repuesto.soles;
@@ -428,48 +404,26 @@ CREATE OR REPLACE PACKAGE BODY otm AS
         envia_correo_instalacion(af);
     END;
 
-    PROCEDURE envia_al_gasto(ot IN OUT ot_mantto%ROWTYPE, fch DATE) IS
-        val T_VALOR;
-    BEGIN
-        val := valor_total(ot.id_tipo, ot.id_serie, ot.id_numero);
-        IF val.soles > 0 THEN
-            otm_asiento.gasto(ot, trunc(fch));
-        END IF;
-        envia_correo_gasto(ot);
-        ot.estado := '8';
-        ot.fecha_cierre := fch;
-        ot.usuario_cierre := user;
-        ot.registro_contable := otm_cst.gasto;
-        ot.total_soles := val.soles;
-        ot.total_dolares := val.dolares;
-        api_ot_mantto.upd(ot);
-    END;
-
-    PROCEDURE activar(tpo ot_mantto.id_tipo%TYPE, ser ot_mantto.id_serie%TYPE, num ot_mantto.id_numero%TYPE,
-                      opcion VARCHAR2, fch DATE) IS
+    PROCEDURE activar(tpo ot_mantto.id_tipo%TYPE, ser ot_mantto.id_serie%TYPE, num ot_mantto.id_numero%TYPE, opcion VARCHAR2, fch DATE) IS
         ot ot_mantto%ROWTYPE;
         af activo_fijo%ROWTYPE;
-        es_mantenimiento BOOLEAN;
-        es_instalacion BOOLEAN;
     BEGIN
         ot := api_ot_mantto.onerow(tpo, ser, num);
         af := api_activo_fijo.onerow(ot.id_activo_fijo);
 
         CASE opcion
-            WHEN otm_cst.activo THEN
+            WHEN otcomun.k_activo THEN
                 valida_activacion(af, ot);
-                es_mantenimiento := ot.id_modo = otm_cst.mantenimiento;
-                es_instalacion := ot.id_modo = otm_cst.instalacion;
 
-                IF es_mantenimiento THEN
+                IF otcomun.es_mantenimiento(ot.id_modo) THEN
                     activa_mantenimiento(ot, af, fch);
                 END IF;
 
-                IF es_instalacion THEN
+                IF otcomun.es_instalacion(ot.id_modo) THEN
                     activa_instalacion(ot, af, fch);
                 END IF;
-            WHEN otm_cst.gasto THEN
-                envia_al_gasto(ot, fch);
+            WHEN otcomun.k_gasto THEN
+                otcomun.envia_al_gasto(ot, fch);
             END CASE;
 
         COMMIT;
