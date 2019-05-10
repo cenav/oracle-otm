@@ -395,8 +395,8 @@ CREATE OR REPLACE PACKAGE BODY otm AS
 
             api_activo_fijo.ins(af);
             otm_asiento.activacion(ot, af, trunc(fch));
-        ELSE
-            raise_application_error(otm_err.en_instalacion_sin_valor, otm_err.em_instalacion_sin_valor);
+         ELSE
+             raise_application_error(otm_err.en_instalacion_sin_valor, otm_err.em_instalacion_sin_valor);
         END IF;
 
     END;
