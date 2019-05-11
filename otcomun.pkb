@@ -67,8 +67,12 @@ CREATE OR REPLACE PACKAGE BODY otcomun AS
     END;
 
     PROCEDURE envia_al_gasto(ot IN OUT ot_mantto%ROWTYPE, fch DATE) IS
+        servicio otm.T_VALOR;
+        repuesto otm.T_VALOR;
         val otm.T_VALOR;
     BEGIN
+        servicio := otm.valor_servicio(ot.id_tipo, ot.id_serie, ot.id_numero);
+        repuesto := otm.valor_repuesto(ot.id_tipo, ot.id_serie, ot.id_numero);
         val := otm.valor_total(ot.id_tipo, ot.id_serie, ot.id_numero);
         IF val.soles > 0 THEN
             otm_asiento.gasto(ot, trunc(fch));
@@ -78,6 +82,10 @@ CREATE OR REPLACE PACKAGE BODY otcomun AS
         ot.fecha_cierre := fch;
         ot.usuario_cierre := user;
         ot.registro_contable := otcomun.k_gasto;
+        ot.total_servicio_soles := servicio.soles;
+        ot.total_servicio_dolares := servicio.dolares;
+        ot.total_repuesto_soles := repuesto.soles;
+        ot.total_repuesto_dolares := repuesto.dolares;
         ot.total_soles := val.soles;
         ot.total_dolares := val.dolares;
         api_ot_mantto.upd(ot);

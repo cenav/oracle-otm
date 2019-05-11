@@ -22,9 +22,18 @@ CREATE OR REPLACE PACKAGE BODY otp AS
         END IF;
     END;
 
-    PROCEDURE activa_obra(ot IN OUT ot_mantto%ROWTYPE, padre activo_fijo%ROWTYPE, fch DATE) IS
+    PROCEDURE activa_obra(ot IN OUT ot_mantto%ROWTYPE, af IN OUT activo_fijo%ROWTYPE, fch DATE) IS
     BEGIN
-        NULL;
+        af.fecha_activacion := fch;
+        af.valor_adquisicion_s := ot.total_activo_soles;
+        af.valor_adquisicion_d := ot.total_activo_dolares;
+        af.otm_tipo := ot.id_tipo;
+        af.otm_serie := ot.id_serie;
+        af.otm_numero := ot.id_numero;
+        af.cod_estado := 1;
+        api_activo_fijo.upd(af);
+        otm_asiento.activacion(ot, af, trunc(fch));
+        cierra_orden(ot, fch);
     END;
 
     PROCEDURE activa_mantenimiento(ot IN OUT ot_mantto%ROWTYPE, padre activo_fijo%ROWTYPE, fch DATE) IS

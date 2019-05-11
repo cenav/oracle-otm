@@ -21,7 +21,7 @@ CREATE OR REPLACE PACKAGE BODY otm_asiento AS
             g_libro := g_param.libro_activo;
             g_voucher := api_movglos.nuevo_numero(g_ano, g_mes, g_libro);
             g_cambio := api_cambdol.onerow(fch, pkg_asiento.c_tipo_cambio).import_cam;
-        END inicializa;
+        END;
 
         PROCEDURE calc_cabecera IS
             mg movglos%ROWTYPE;
@@ -43,7 +43,7 @@ CREATE OR REPLACE PACKAGE BODY otm_asiento AS
             mg.nro_planilla := TO_CHAR(fch, 'DD/MM/YYYY');
 
             api_movglos.ins(mg);
-        END calc_cabecera;
+        END;
 
         PROCEDURE calc_cuenta_costo IS
             md movdeta%ROWTYPE;
@@ -52,7 +52,7 @@ CREATE OR REPLACE PACKAGE BODY otm_asiento AS
             md.mes := g_mes;
             md.libro := g_libro;
             md.voucher := g_voucher;
-            md.cuenta := g_param.cuenta_maquina_activo;
+            md.cuenta := af.cuenta_contable;
             md.tipo_cambio := pkg_asiento.c_tipo_cambio;
             md.tipo_relacion := 'U';
             md.relacion := af.centro_costo;
@@ -167,7 +167,7 @@ CREATE OR REPLACE PACKAGE BODY otm_asiento AS
             g_cambio := api_cambdol.onerow(fch, pkg_asiento.c_tipo_cambio).import_cam;
             g_activo := api_activo_fijo.onerow(ot.id_activo_fijo);
             val := otm.valor_total(ot.id_tipo, ot.id_serie, ot.id_numero);
-        END inicializa;
+        END;
 
         PROCEDURE calc_cabecera IS
             mg movglos%ROWTYPE;
@@ -189,7 +189,7 @@ CREATE OR REPLACE PACKAGE BODY otm_asiento AS
             mg.nro_planilla := TO_CHAR(fch, 'DD/MM/YYYY');
 
             api_movglos.ins(mg);
-        END calc_cabecera;
+        END;
 
         PROCEDURE calc_cuenta_gasto IS
             md movdeta%ROWTYPE;
@@ -199,10 +199,10 @@ CREATE OR REPLACE PACKAGE BODY otm_asiento AS
             md.libro := g_libro;
             md.voucher := g_voucher;
             CASE
-                WHEN otcomun.ES_MAQUINA(ot.id_tipo) THEN
-                    md.cuenta := g_param.cuenta_maquina_gasto;
-                WHEN otcomun.ES_PROYECTO(ot.id_tipo) THEN
-                    md.cuenta := g_param.cuenta_proyecto_gasto;
+                WHEN otcomun.es_maquina(ot.id_tipo) THEN md.cuenta := g_param.cuenta_maquina_gasto;
+                WHEN otcomun.es_proyecto(ot.id_tipo) THEN md.cuenta := g_param.cuenta_proyecto_gasto;
+                WHEN otcomun.es_vehiculo(ot.id_tipo) THEN md.cuenta := g_param.cuenta_vehiculo_gasto;
+                ELSE md.cuenta := g_param.cuenta_maquina_gasto;
             END CASE;
             md.tipo_cambio := pkg_asiento.c_tipo_cambio;
             md.tipo_relacion := 'U';

@@ -13,5 +13,7 @@ CREATE OR REPLACE PACKAGE PEVISA.otm AS
     PROCEDURE mail_mantto_preventivo;
     PROCEDURE activar(tpo ot_mantto.id_tipo%TYPE, ser ot_mantto.id_serie%TYPE, num ot_mantto.id_numero%TYPE,
                       opcion VARCHAR2, fch DATE);
+    FUNCTION valor_servicio(tpo ot_mantto.id_tipo%TYPE, ser ot_mantto.id_serie%TYPE, num ot_mantto.id_numero%TYPE) RETURN T_VALOR;
+    FUNCTION valor_repuesto(tpo ot_mantto.id_tipo%TYPE, ser ot_mantto.id_serie%TYPE, num ot_mantto.id_numero%TYPE) RETURN T_VALOR;        
 END otm;
 /
