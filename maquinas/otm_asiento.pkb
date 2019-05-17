@@ -58,7 +58,7 @@ CREATE OR REPLACE PACKAGE BODY otm_asiento AS
             md.relacion := af.centro_costo;
             md.tipo_referencia := '00';
             md.serie := '0000';
-            md.nro_referencia := af.cod_activo_fijo;
+            md.nro_referencia := substr(af.cod_activo_fijo, 0, 20);
             md.fecha := fch;
             md.detalle := ot.id_serie || '-' || ot.id_numero;
             md.cargo_s := af.valor_adquisicion_s;
@@ -90,7 +90,7 @@ CREATE OR REPLACE PACKAGE BODY otm_asiento AS
             md.relacion := af.centro_costo;
             md.tipo_referencia := '00';
             md.serie := '0000';
-            md.nro_referencia := af.cod_activo_fijo;
+            md.nro_referencia := substr(af.cod_activo_fijo, 0, 20);
             md.fecha := fch;
             md.detalle := ot.id_serie || '-' || ot.id_numero;
             md.cargo_s := 0;
@@ -203,7 +203,7 @@ CREATE OR REPLACE PACKAGE BODY otm_asiento AS
                 WHEN otcomun.es_proyecto(ot.id_tipo) THEN md.cuenta := g_param.cuenta_proyecto_gasto;
                 WHEN otcomun.es_vehiculo(ot.id_tipo) THEN md.cuenta := g_param.cuenta_vehiculo_gasto;
                 ELSE md.cuenta := g_param.cuenta_maquina_gasto;
-            END CASE;
+                END CASE;
             md.tipo_cambio := pkg_asiento.c_tipo_cambio;
             md.tipo_relacion := 'U';
             md.relacion := ot.centro_costo;

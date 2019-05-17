@@ -123,33 +123,6 @@ CREATE OR REPLACE PACKAGE BODY otm AS
         RETURN estado = 3;
     END;
 
-    PROCEDURE envia_correo_activacion(af activo_fijo%ROWTYPE) IS
-        CURSOR cr_correos IS
-            SELECT correo
-              FROM notificacion
-             WHERE sistema = 'ACTIVO_FIJO'
-               AND proceso = 'ACTIVACION';
-
-        mail    pkg_types.CORREO;
-        s       VARCHAR2(10) := '-';
-        asiento activo_fijo_asiento%ROWTYPE;
-    BEGIN
-        asiento := api_activo_fijo_asiento.ONEROW(af.cod_activo_fijo, 'ACTIVO');
-        mail.asunto := 'Activación de OTM ' || af.cod_activo_fijo;
-        mail.de := 'sistemas@pevisa.com.pe';
-        mail.texto := 'Se ha activado la siguiente OTM:' || chr(10) || chr(10);
-        mail.texto := rtrim(mail.texto) || 'Código: ' || af.cod_activo_fijo || chr(10);
-        mail.texto := rtrim(mail.texto) || 'Descripción: ' || af.descripcion || chr(10);
-        mail.texto := rtrim(mail.texto) || 'OTM: ' || af.otm_tipo || s || af.otm_serie || s || af.otm_numero || chr(10);
-        mail.texto := rtrim(mail.texto) || 'Fecha activación: ' || to_char(af.fecha_activacion, 'DD/MM/YYYY') || chr(10);
-        mail.texto := rtrim(mail.texto) || 'Asiento Contable: ' || asiento.ano || s || asiento.mes || s ||
-                      asiento.libro || s || asiento.voucher || chr(10);
-
-        FOR r IN cr_correos LOOP
-            enviar_correo(mail.de, r.correo, mail.asunto, mail.texto);
-        END LOOP;
-    END;
-
     PROCEDURE envia_correo_instalacion(af activo_fijo%ROWTYPE) IS
         CURSOR cr_correos IS
             SELECT correo
@@ -256,16 +229,9 @@ CREATE OR REPLACE PACKAGE BODY otm AS
 
         api_activo_fijo.ins(af);
         otm_asiento.activacion(ot, af, trunc(fch));
-
-        ot.estado := 8;
-        ot.fecha_cierre := fch;
-        ot.usuario_cierre := user;
-        ot.registro_contable := otcomun.k_activo;
-        ot.total_soles := val.soles;
-        ot.total_dolares := val.dolares;
+        otcomun.cierra_orden(ot, fch);
         api_ot_mantto.upd(ot);
-
-        envia_correo_activacion(af);
+        otcomun.envia_correo_activacion(af);
     END;
 
     PROCEDURE saca_del_almacen(af IN OUT activo_fijo%ROWTYPE, fch DATE) IS
@@ -377,30 +343,11 @@ CREATE OR REPLACE PACKAGE BODY otm AS
 
     END;
 
-    PROCEDURE cierra_orden(ot IN OUT ot_mantto%ROWTYPE, fch DATE) IS
-        servicio T_VALOR;
-        repuesto T_VALOR;
-    BEGIN
-        servicio := valor_servicio(ot.id_tipo, ot.id_serie, ot.id_numero);
-        repuesto := valor_repuesto(ot.id_tipo, ot.id_serie, ot.id_numero);
-        ot.estado := 8;
-        ot.fecha_cierre := fch;
-        ot.usuario_cierre := user;
-        ot.registro_contable := otcomun.k_activo;
-        ot.total_servicio_soles := servicio.soles;
-        ot.total_servicio_dolares := servicio.dolares;
-        ot.total_repuesto_soles := repuesto.soles;
-        ot.total_repuesto_dolares := repuesto.dolares;
-        ot.total_soles := ot.total_activo_soles + servicio.soles + repuesto.soles;
-        ot.total_dolares := ot.total_activo_dolares + servicio.dolares + repuesto.dolares;
-        api_ot_mantto.upd(ot);
-    END;
-
     PROCEDURE activa_instalacion(ot IN OUT ot_mantto%ROWTYPE, af IN OUT activo_fijo%ROWTYPE, fch DATE) IS
     BEGIN
         activa_activo_fijo(ot, af, fch);
         activa_servicio_instalacion(ot, af, fch);
-        cierra_orden(ot, fch);
+        otcomun.cierra_orden(ot, fch);
         envia_correo_instalacion(af);
     END;
 

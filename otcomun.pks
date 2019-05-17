@@ -28,6 +28,8 @@ CREATE OR REPLACE PACKAGE otcomun AS
     PRAGMA EXCEPTION_INIT (ex_no_es_proyecto, -20003);
 
     PROCEDURE envia_al_gasto(ot IN OUT ot_mantto%ROWTYPE, fch DATE);
+    PROCEDURE cierra_orden(ot IN OUT ot_mantto%ROWTYPE, fch DATE);
+    PROCEDURE envia_correo_activacion(af activo_fijo%ROWTYPE);
 
     FUNCTION es_maquina(tipo ot_mantto.id_tipo%TYPE) RETURN BOOLEAN;
     FUNCTION es_proyecto(tipo ot_mantto.id_tipo%TYPE) RETURN BOOLEAN;

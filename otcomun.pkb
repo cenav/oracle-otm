@@ -31,6 +31,35 @@ CREATE OR REPLACE PACKAGE BODY otcomun AS
         RETURN modo = otcomun.k_obra;
     END;
 
+    PROCEDURE envia_correo_activacion(af activo_fijo%ROWTYPE) IS
+        CURSOR cr_correos IS
+            SELECT correo
+              FROM notificacion
+             WHERE sistema = 'ACTIVO_FIJO'
+               AND proceso = 'ACTIVACION';
+
+        mail    pkg_types.CORREO;
+        s       VARCHAR2(10) := '-';
+        asiento activo_fijo_asiento%ROWTYPE;
+        tipo    ot_mantto_tipo%ROWTYPE;
+    BEGIN
+        tipo := api_ot_mantto_tipo.ONEROW(af.otm_tipo);
+        asiento := api_activo_fijo_asiento.ONEROW(af.cod_activo_fijo, 'ACTIVO');
+        mail.asunto := 'Activación de ' || tipo.abreviada || ' ' || af.cod_activo_fijo;
+        mail.de := 'sistemas@pevisa.com.pe';
+        mail.texto := 'Se ha activado la siguiente ' || tipo.abreviada || ':' || chr(10) || chr(10);
+        mail.texto := rtrim(mail.texto) || 'Código: ' || af.cod_activo_fijo || chr(10);
+        mail.texto := rtrim(mail.texto) || 'Descripción: ' || af.descripcion || chr(10);
+        mail.texto := rtrim(mail.texto) || tipo.abreviada || ': ' || af.otm_tipo || s || af.otm_serie || s || af.otm_numero || chr(10);
+        mail.texto := rtrim(mail.texto) || 'Fecha activación: ' || to_char(af.fecha_activacion, 'DD/MM/YYYY') || chr(10);
+        mail.texto := rtrim(mail.texto) || 'Asiento Contable: ' || asiento.ano || s || asiento.mes || s ||
+                      asiento.libro || s || asiento.voucher || chr(10);
+
+        FOR r IN cr_correos LOOP
+            enviar_correo(mail.de, r.correo, mail.asunto, mail.texto);
+        END LOOP;
+    END;
+
     PROCEDURE envia_correo_gasto(ot ot_mantto%ROWTYPE) IS
         CURSOR cr_correos IS
             SELECT correo
@@ -69,7 +98,7 @@ CREATE OR REPLACE PACKAGE BODY otcomun AS
     PROCEDURE envia_al_gasto(ot IN OUT ot_mantto%ROWTYPE, fch DATE) IS
         servicio otm.T_VALOR;
         repuesto otm.T_VALOR;
-        val otm.T_VALOR;
+        val      otm.T_VALOR;
     BEGIN
         servicio := otm.valor_servicio(ot.id_tipo, ot.id_serie, ot.id_numero);
         repuesto := otm.valor_repuesto(ot.id_tipo, ot.id_serie, ot.id_numero);
@@ -89,6 +118,24 @@ CREATE OR REPLACE PACKAGE BODY otcomun AS
         ot.total_soles := val.soles;
         ot.total_dolares := val.dolares;
         api_ot_mantto.upd(ot);
+    END;
+
+    PROCEDURE cierra_orden(ot IN OUT ot_mantto%ROWTYPE, fch DATE) IS
+        servicio otm.T_VALOR;
+        repuesto otm.T_VALOR;
+    BEGIN
+        servicio := otm.valor_servicio(ot.id_tipo, ot.id_serie, ot.id_numero);
+        repuesto := otm.valor_repuesto(ot.id_tipo, ot.id_serie, ot.id_numero);
+        ot.estado := 8;
+        ot.fecha_cierre := fch;
+        ot.usuario_cierre := user;
+        ot.registro_contable := otcomun.k_activo;
+        ot.total_servicio_soles := servicio.soles;
+        ot.total_servicio_dolares := servicio.dolares;
+        ot.total_repuesto_soles := repuesto.soles;
+        ot.total_repuesto_dolares := repuesto.dolares;
+        ot.total_soles := ot.total_activo_soles + servicio.soles + repuesto.soles;
+        ot.total_dolares := ot.total_activo_dolares + servicio.dolares + repuesto.dolares;
     END;
 END otcomun;
 /
